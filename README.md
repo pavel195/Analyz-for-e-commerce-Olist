@@ -141,9 +141,9 @@
 
 
 ## Авторы
-- [Павел Чипкинеев](https://github.com/pavel195)
+- [![GitHub](https://img.shields.io/badge/GitHub-pavel195-181717?style=flat-square&logo=github)](https://github.com/pavel195)
 
 ## Контакты
-- [mail](mailto:pavel195@yandex.ru)
-- [GitHub](https://github.com/pavel195)
-- [telegram](https://t.me/YungTruppa)
+- [![Email](https://img.shields.io/badge/Email-pavel195%40yandex.ru-red?style=flat-square&logo=gmail)](mailto:pavel195@yandex.ru)
+- [![GitHub](https://img.shields.io/badge/GitHub-pavel195-181717?style=flat-square&logo=github)](https://github.com/pavel195)
+- [![Telegram](https://img.shields.io/badge/Telegram-YungTruppa-2CA5E0?style=flat-square&logo=telegram)](https://t.me/YungTruppa)
