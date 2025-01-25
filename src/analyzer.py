@@ -4,17 +4,23 @@ from typing import Dict, List, Tuple
 import matplotlib.pyplot as plt
 import seaborn as sns
 import os
+import warnings
+
+# Игнорируем предупреждения о FutureWarning
+warnings.simplefilter(action='ignore', category=FutureWarning)
 
 class OlistAnalyzer:
-    def __init__(self, products_df: pd.DataFrame, items_df: pd.DataFrame, output_dir: str = 'reports'):
+    def __init__(self, products_df: pd.DataFrame, items_df: pd.DataFrame, orders_df: pd.DataFrame, output_dir: str = 'reports'):
         """
         Args:
             products_df: DataFrame с информацией о продуктах и категориях
             items_df: DataFrame с информацией о продажах
+            orders_df: DataFrame с информацией о заказах
             output_dir: Директория для сохранения отчетов и визуализаций
         """
         self.products_df = products_df
         self.items_df = items_df
+        self.orders_df = orders_df
         self.output_dir = output_dir
         
         # Создаем директорию для отчетов, если её нет
@@ -110,47 +116,47 @@ class OlistAnalyzer:
 
     def generate_detailed_excel_report(self) -> None:
         """
-        Создание подробного Excel-отчета с несколькими листами:
-        - Общие метрики по категориям
-        - Анализ продаж
-        - Анализ среднего чека
-        - Анализ популярности категорий
-        - Анализ доставки
+        Создание подробного Excel-отчета с несколькими листами
         """
-        # Создаем writer для Excel
-        report_path = os.path.join(self.output_dir, 'detailed_analysis_report.xlsx')
-        with pd.ExcelWriter(report_path, engine='xlsxwriter') as writer:
-            # 1. Общие метрики по категориям
-            category_metrics = self.calculate_category_metrics()
-            category_metrics.to_excel(writer, sheet_name='Общие метрики', index=False)
-            
-            # 2. Анализ продаж по месяцам
-            sales_by_month = self.analyze_sales_by_month()
-            sales_by_month.to_excel(writer, sheet_name='Продажи по месяцам', index=True)
-            
-            # 3. Анализ среднего чека
-            avg_ticket_analysis = self.analyze_average_ticket()
-            avg_ticket_analysis.to_excel(writer, sheet_name='Средний чек', index=False)
-            
-            # 4. Популярность категорий
-            category_popularity = self.analyze_category_popularity()
-            category_popularity.to_excel(writer, sheet_name='Популярность категорий', index=False)
-            
-            # 5. Анализ доставки
-            delivery_analysis = self.analyze_delivery_metrics()
-            delivery_analysis.to_excel(writer, sheet_name='Метрики доставки', index=False)
-            
-            # Получаем workbook и добавляем форматирование
-            workbook = writer.book
-            
-            # Форматы для чисел и процентов
-            number_format = workbook.add_format({'num_format': '#,##0.00'})
-            percent_format = workbook.add_format({'num_format': '0.00%'})
-            
-            # Применяем форматирование к каждому листу
-            for worksheet in writer.sheets.values():
-                worksheet.set_column('A:Z', 15)  # Ширина колонок
+        try:
+            # Создаем writer для Excel
+            report_path = os.path.join(self.output_dir, 'detailed_analysis_report.xlsx')
+            with pd.ExcelWriter(report_path, engine='xlsxwriter') as writer:
+                # 1. Общие метрики по категориям
+                category_metrics = self.calculate_category_metrics()
+                category_metrics.to_excel(writer, sheet_name='Общие метрики', index=False)
                 
+                # 2. Анализ продаж по месяцам
+                sales_by_month = self.analyze_sales_by_month()
+                sales_by_month.to_excel(writer, sheet_name='Продажи по месяцам', index=False)
+                
+                # 3. Анализ среднего чека
+                avg_ticket_analysis = self.analyze_average_ticket()
+                avg_ticket_analysis.to_excel(writer, sheet_name='Средний чек', index=False)
+                
+                # 4. Популярность категорий
+                category_popularity = self.analyze_category_popularity()
+                category_popularity.to_excel(writer, sheet_name='Популярность категорий', index=False)
+                
+                # 5. Анализ доставки
+                delivery_analysis = self.analyze_delivery_metrics()
+                delivery_analysis.to_excel(writer, sheet_name='Метрики доставки', index=False)
+                
+                # Получаем workbook и добавляем форматирование
+                workbook = writer.book
+                
+                # Форматы для чисел и процентов
+                number_format = workbook.add_format({'num_format': '#,##0.00'})
+                percent_format = workbook.add_format({'num_format': '0.00%'})
+                
+                # Применяем форматирование к каждому листу
+                for worksheet in writer.sheets.values():
+                    worksheet.set_column('A:Z', 15)  # Ширина колонок
+                    
+        except Exception as e:
+            print(f"Ошибка при создании отчета: {str(e)}")
+            raise
+    
     def analyze_sales_by_month(self) -> pd.DataFrame:
         """Анализ продаж по месяцам"""
         # Объединяем данные о заказах и товарах
@@ -161,19 +167,20 @@ class OlistAnalyzer:
         
         # Добавляем информацию о дате заказа
         sales_data = sales_data.merge(
-            self.datasets['orders'][['order_id', 'order_purchase_timestamp']],
+            self.orders_df[['order_id', 'order_purchase_timestamp']],
             on='order_id'
         )
         
         # Конвертируем дату и создаем колонку месяц-год
         sales_data['order_date'] = pd.to_datetime(sales_data['order_purchase_timestamp'])
-        sales_data['month_year'] = sales_data['order_date'].dt.to_period('M')
+        sales_data['month_year'] = sales_data['order_date'].dt.strftime('%Y-%m')
         
         # Группируем по месяцам и категориям
-        monthly_sales = sales_data.groupby(['month_year', 'normalized_category']).agg({
-            'order_id': 'count',
-            'price': 'sum'
-        }).reset_index()
+        monthly_sales = sales_data.groupby(['month_year', 'normalized_category']).agg(
+            total_orders=('order_id', 'count'),
+            total_revenue=('price', 'sum'),
+            avg_order_value=('price', 'mean')
+        ).reset_index()
         
         return monthly_sales
     
@@ -209,7 +216,11 @@ class OlistAnalyzer:
     def analyze_delivery_metrics(self) -> pd.DataFrame:
         """Анализ метрик доставки"""
         # Объединяем данные о заказах и доставке
-        delivery_data = self.datasets['orders'].copy()
+        delivery_data = self.orders_df.copy()
+        
+        # Отфильтруем только доставленные заказы
+        delivery_data = delivery_data.dropna(subset=['order_delivered_customer_date'])
+        
         delivery_data['order_purchase_timestamp'] = pd.to_datetime(
             delivery_data['order_purchase_timestamp']
         )
@@ -230,9 +241,12 @@ class OlistAnalyzer:
                 on='product_id'
             ),
             on='order_id'
-        ).groupby('normalized_category').agg({
-            'delivery_time': ['mean', 'std', 'min', 'max'],
-            'order_id': 'count'
-        }).reset_index()
+        ).groupby('normalized_category').agg(
+            mean_delivery_time=('delivery_time', 'mean'),
+            std_delivery_time=('delivery_time', 'std'),
+            min_delivery_time=('delivery_time', 'min'),
+            max_delivery_time=('delivery_time', 'max'),
+            total_orders=('order_id', 'count')
+        ).reset_index()
         
         return delivery_metrics 
